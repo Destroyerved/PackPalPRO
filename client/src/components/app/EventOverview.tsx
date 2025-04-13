@@ -28,6 +28,10 @@ export default function EventOverview({ event, items, members }: EventOverviewPr
   const deliveredCount = items.filter(item => item.status === ItemStatus.DELIVERED).length;
   const totalItems = items.length;
   
+  const handleDownloadPDF = () => {
+    window.open(`/api/events/${event.id}/checklist.pdf`, '_blank');
+  };
+  
   return (
     <Card className="mb-6">
       <CardContent className="p-4 sm:p-6">
@@ -49,7 +53,12 @@ export default function EventOverview({ event, items, members }: EventOverviewPr
             <Button variant="ghost" size="icon" className="text-slate-500">
               <Share className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" className="text-slate-500">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-slate-500"
+              onClick={handleDownloadPDF}
+            >
               <Download className="h-5 w-5" />
             </Button>
             <DropdownMenu>

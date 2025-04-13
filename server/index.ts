@@ -1,10 +1,25 @@
-import express, { type Request, Response, NextFunction } from "express";
+import express from 'express';
+import { PrismaClient } from '@prisma/client';
+import cors from 'cors';
+import eventsRouter from './routes/events';
+import notificationRoutes from './routes/notifications';
+import pollRoutes from './routes/polls';
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
+const prisma = new PrismaClient();
+
+// Middleware
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Add Prisma client to request
+app.use((req, res, next) => {
+  req.db = prisma;
+  next();
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -36,35 +51,28 @@ app.use((req, res, next) => {
   next();
 });
 
+// Routes
+app.use('/api/events', eventsRouter);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/polls', pollRoutes);
+
+// Error handling
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something broke!' });
+});
+
 (async () => {
+  const PORT = Number(process.env.PORT) || 3000;
   const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
+  server.listen(PORT, () => {
+    log(`Server is running on port ${PORT}`);
   });
 })();

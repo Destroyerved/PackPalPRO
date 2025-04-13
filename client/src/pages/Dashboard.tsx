@@ -22,20 +22,39 @@ export default function Dashboard() {
   const [isNewEventDialogOpen, setIsNewEventDialogOpen] = useState(false);
   const [isJoinEventDialogOpen, setIsJoinEventDialogOpen] = useState(false);
   
-  // Fetch current user data
-  const { data: user, isLoading: isLoadingUser, isError: isUserError } = useQuery({ 
-    queryKey: ['/api/auth/me'] 
-  });
+  // Mock user data for direct access
+  const mockUser = {
+    id: 1,
+    username: 'demo',
+    password: 'demo123',
+    email: 'demo@example.com',
+    fullName: 'Demo User',
+    profilePic: null,
+    createdAt: new Date()
+  };
+  const user = mockUser;
+  const isLoadingUser = false;
+  const isUserError = false;
   
-  // Fetch user's events
-  const { 
-    data: events, 
-    isLoading: isLoadingEvents, 
-    isError: isEventsError 
-  } = useQuery({ 
-    queryKey: ['/api/events'],
-    enabled: !!user, // Only fetch events if user is loaded
-  });
+  // Mock events data
+  const mockEvents = [
+    {
+      id: 1,
+      name: 'Demo Event',
+      description: 'A demo event for testing',
+      createdAt: new Date(),
+      startDate: new Date(),
+      endDate: new Date(),
+      location: 'Demo Location',
+      createdBy: 1,
+      userRoles: {}
+    }
+  ];
+
+  // Use mock events data
+  const events = mockEvents;
+  const isLoadingEvents = false;
+  const isEventsError = false;
   
   // Authenticate WebSocket connection
   useEffect(() => {

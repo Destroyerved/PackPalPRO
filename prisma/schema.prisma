@@ -1,0 +1,64 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         Int      @id @default(autoincrement())
+  username   String   @unique
+  password   String
+  email      String   @unique
+  fullName   String
+  profilePic String?
+  createdAt  DateTime @default(now())
+  events     Event[]
+}
+
+model Event {
+  id          Int        @id @default(autoincrement())
+  name        String
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  location    String?
+  createdAt   DateTime   @default(now())
+  createdBy   Int
+  userRoles   Json       @default("{}")
+  categories  Category[]
+  items       Item[]
+  owner       User       @relation(fields: [createdBy], references: [id])
+
+  @@index([createdBy])
+}
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String
+  eventId   Int
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  items     Item[]
+  createdAt DateTime @default(now())
+
+  @@index([eventId])
+}
+
+model Item {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  categoryId  Int
+  eventId     Int
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@index([categoryId])
+  @@index([eventId])
+} 

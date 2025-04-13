@@ -10,6 +10,14 @@ import {
   insertItemSchema, insertEventMemberSchema, WebSocketMessageType, 
   WebSocketMessage, UserRole
 } from "@shared/schema";
+import { generateChecklistPDF } from './utils/pdfGenerator';
+
+// Declare custom session type
+declare module 'express-session' {
+  interface SessionData {
+    userId: number;
+  }
+}
 
 // Create session store
 const SessionStore = MemoryStore(session);
@@ -260,7 +268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const eventMember = await storage.getEventMember(eventId, userId);
       if (
         event.createdBy !== userId && 
-        (!eventMember || ![UserRole.OWNER, UserRole.ADMIN].includes(eventMember.role as UserRole))
+        (!eventMember || ![UserRole.OWNER, UserRole.ADMIN].includes(eventMember.role))
       ) {
         return res.status(403).json({ message: "Not authorized to update this event" });
       }
@@ -352,7 +360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const eventMember = await storage.getEventMember(eventId, userId);
       if (
         event.createdBy !== userId && 
-        (!eventMember || ![UserRole.OWNER, UserRole.ADMIN].includes(eventMember.role as UserRole))
+        (!eventMember || ![UserRole.OWNER, UserRole.ADMIN].includes(eventMember.role))
       ) {
         return res.status(403).json({ message: "Not authorized to add members to this event" });
       }
@@ -405,7 +413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { role } = req.body;
       
       // Check if valid role
-      if (!Object.values(UserRole).includes(role as UserRole)) {
+      if (!Object.values(UserRole).includes(role)) {
         return res.status(400).json({ message: "Invalid role" });
       }
       
@@ -467,7 +475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const currentUserMember = await storage.getEventMember(eventId, currentUserId);
         if (
           event.createdBy !== currentUserId && 
-          (!currentUserMember || ![UserRole.OWNER, UserRole.ADMIN].includes(currentUserMember.role as UserRole))
+          (!currentUserMember || ![UserRole.OWNER, UserRole.ADMIN].includes(currentUserMember.role))
         ) {
           return res.status(403).json({ message: "Not authorized to remove members" });
         }
@@ -536,7 +544,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const eventMember = await storage.getEventMember(eventId, userId);
       if (
         event.createdBy !== userId && 
-        (!eventMember || ![UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER].includes(eventMember.role as UserRole))
+        (!eventMember || ![UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER].includes(eventMember.role))
       ) {
         return res.status(403).json({ message: "Not authorized to add categories to this event" });
       }
@@ -585,7 +593,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const eventMember = await storage.getEventMember(category.eventId, userId);
       if (
         event.createdBy !== userId && 
-        (!eventMember || ![UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER].includes(eventMember.role as UserRole))
+        (!eventMember || ![UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER].includes(eventMember.role))
       ) {
         return res.status(403).json({ message: "Not authorized to update this category" });
       }
@@ -629,7 +637,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const eventMember = await storage.getEventMember(category.eventId, userId);
       if (
         event.createdBy !== userId && 
-        (!eventMember || ![UserRole.OWNER, UserRole.ADMIN].includes(eventMember.role as UserRole))
+        (!eventMember || ![UserRole.OWNER, UserRole.ADMIN].includes(eventMember.role))
       ) {
         return res.status(403).json({ message: "Not authorized to delete this category" });
       }
@@ -691,7 +699,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const eventMember = await storage.getEventMember(eventId, userId);
       if (
         event.createdBy !== userId && 
-        (!eventMember || ![UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER].includes(eventMember.role as UserRole))
+        (!eventMember || ![UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER].includes(eventMember.role))
       ) {
         return res.status(403).json({ message: "Not authorized to add items to this event" });
       }
@@ -750,7 +758,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check role-based permissions
       const canEdit = event.createdBy === userId || 
-                      (eventMember && [UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER].includes(eventMember.role as UserRole)) ||
+                      (eventMember && [UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER].includes(eventMember.role)) ||
                       (item.assignedTo === userId); // Assigned users can update status
                       
       if (!canEdit) {
@@ -804,7 +812,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const eventMember = await storage.getEventMember(item.eventId, userId);
       
       const canDelete = event.createdBy === userId || 
-                        (eventMember && [UserRole.OWNER, UserRole.ADMIN].includes(eventMember.role as UserRole)) || 
+                        (eventMember && [UserRole.OWNER, UserRole.ADMIN].includes(eventMember.role)) || 
                         (item.createdBy === userId); // Creator can delete their own items
       
       if (!canDelete) {
@@ -830,16 +838,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add PDF generation endpoint
+  app.get("/api/events/:id/checklist.pdf", isAuthenticated, async (req, res) => {
+    try {
+      const eventId = parseInt(req.params.id);
+      const userId = req.session.userId!;
+      
+      // Get event
+      const event = await storage.getEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      // Check if user has access
+      const eventMember = await storage.getEventMember(eventId, userId);
+      if (!eventMember && event.createdBy !== userId) {
+        return res.status(403).json({ message: "Not authorized to access this event" });
+      }
+      
+      // Get categories and items
+      const categories = await storage.getCategories(eventId);
+      const items = await storage.getItems(eventId);
+      
+      // Generate PDF
+      const pdfBuffer = await generateChecklistPDF({
+        event,
+        categories,
+        items
+      });
+      
+      // Send PDF
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${event.name}-checklist.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      return res.status(500).json({ message: "Error generating PDF" });
+    }
+  });
+
   // Create HTTP server
   const httpServer = createServer(app);
 
   // Create WebSocket server
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  const wss = new WebSocketServer({ 
+    server: httpServer,
+    path: '/ws'
+  });
 
   // Store connected clients with their session IDs and event subscriptions
   const clients = new Map<WebSocket, { userId?: number, subscriptions: Set<number> }>();
 
   wss.on('connection', (ws: WebSocket) => {
+    console.log('WebSocket client connected');
     // Initialize client data
     clients.set(ws, { subscriptions: new Set() });
 

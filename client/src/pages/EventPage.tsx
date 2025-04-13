@@ -9,6 +9,14 @@ import CategoryList from "@/components/app/CategoryList";
 import { useWebSocket } from "@/lib/websocket";
 import NewItemDialog from "@/components/app/NewItemDialog";
 import { Helmet } from "react-helmet-async";
+import { useParams } from 'react-router-dom';
+import { useEventStore } from '@/stores/eventStore';
+import { UserRoleBadge } from '@/components/UserRoleBadge';
+import { RoleBasedButton } from '@/components/RoleBasedButton';
+import { UserRoleManager } from '@/components/UserRoleManager';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Event } from '@shared/schema';
 
 export default function EventPage() {
   const [_, navigate] = useLocation();
@@ -16,8 +24,10 @@ export default function EventPage() {
   const { toast } = useToast();
   const { authenticate, subscribe, unsubscribe } = useWebSocket();
   const [isNewItemDialogOpen, setIsNewItemDialogOpen] = useState(false);
+  const { eventId } = useParams();
+  const { currentEvent, setCurrentEvent, updateEvent, deleteEvent } = useEventStore();
   
-  const eventId = parseInt(params?.id || "0");
+  const eventIdParsed = parseInt(params?.id || "0");
   
   // Fetch current user data
   const { data: user, isLoading: isLoadingUser, isError: isUserError } = useQuery({ 
@@ -36,15 +46,15 @@ export default function EventPage() {
     isLoading: isLoadingEvent, 
     isError: isEventError 
   } = useQuery({ 
-    queryKey: [`/api/events/${eventId}`],
-    enabled: !!user && eventId > 0,
+    queryKey: [`/api/events/${eventIdParsed}`],
+    enabled: !!user && eventIdParsed > 0,
   });
   
   // Fetch event categories
   const { 
     data: categories
   } = useQuery({ 
-    queryKey: [`/api/events/${eventId}/categories`],
+    queryKey: [`/api/events/${eventIdParsed}/categories`],
     enabled: !!event,
   });
   
@@ -52,7 +62,7 @@ export default function EventPage() {
   const { 
     data: items
   } = useQuery({ 
-    queryKey: [`/api/events/${eventId}/items`],
+    queryKey: [`/api/events/${eventIdParsed}/items`],
     enabled: !!event,
   });
   
@@ -60,7 +70,7 @@ export default function EventPage() {
   const { 
     data: members
   } = useQuery({ 
-    queryKey: [`/api/events/${eventId}/members`],
+    queryKey: [`/api/events/${eventIdParsed}/members`],
     enabled: !!event,
   });
   
@@ -69,17 +79,17 @@ export default function EventPage() {
     if (user?.id) {
       authenticate(user.id);
       
-      if (eventId) {
-        subscribe(eventId);
+      if (eventIdParsed) {
+        subscribe(eventIdParsed);
       }
     }
     
     return () => {
-      if (eventId) {
-        unsubscribe(eventId);
+      if (eventIdParsed) {
+        unsubscribe(eventIdParsed);
       }
     };
-  }, [user, eventId, authenticate, subscribe, unsubscribe]);
+  }, [user, eventIdParsed, authenticate, subscribe, unsubscribe]);
   
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -120,14 +130,37 @@ export default function EventPage() {
     }
   };
   
+  useEffect(() => {
+    if (eventId) {
+      // Fetch event data
+      fetch(`/api/events/${eventId}`)
+        .then(res => res.json())
+        .then((data: Event) => setCurrentEvent(data))
+        .catch(error => {
+          toast({
+            title: 'Error',
+            description: 'Failed to load event',
+            variant: 'destructive',
+          });
+        });
+    }
+  }, [eventId, setCurrentEvent, toast]);
+  
   if (isLoadingUser || isLoadingEvent) {
     return <div className="flex h-screen justify-center items-center">Loading...</div>;
   }
   
+  if (!currentEvent) {
+    return <div>Loading...</div>;
+  }
+
+  const currentUserId = 'current-user-id'; // This should come from your auth context
+  const currentRole = currentEvent.userRoles[currentUserId] as UserRole;
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-100">
       <Helmet>
-        <title>{event?.name ? `${event.name} - PackPal` : 'Event - PackPal'}</title>
+        <title>{currentEvent?.name ? `${currentEvent.name} - PackPal` : 'Event - PackPal'}</title>
       </Helmet>
       
       {/* Sidebar */}
@@ -135,14 +168,14 @@ export default function EventPage() {
         user={user} 
         onLogout={handleLogout} 
         activePage="event" 
-        activeEventId={eventId}
+        activeEventId={eventIdParsed}
         events={events || []} 
       />
       
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
         <Header 
-          title={event?.name || "Event"}
+          title={currentEvent?.name || "Event"}
           user={user}
           onNewItem={() => setIsNewItemDialogOpen(true)}
           newItemLabel="New Item"
@@ -151,7 +184,7 @@ export default function EventPage() {
         <main className="p-6">
           {/* Event Overview */}
           <EventOverview 
-            event={event}
+            event={currentEvent}
             items={items || []}
             members={members || []}
           />
@@ -161,8 +194,64 @@ export default function EventPage() {
             categories={categories || []}
             items={items || []}
             members={members || []}
-            eventId={eventId}
+            eventId={eventIdParsed}
           />
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Event Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <RoleBasedButton
+                  permission="canEditItems"
+                  currentRole={currentRole}
+                  onClick={() => {
+                    updateEvent(currentEvent.id.toString(), { name: 'Updated Event Name' });
+                  }}
+                >
+                  Edit Event
+                </RoleBasedButton>
+
+                <RoleBasedButton
+                  permission="canManageUsers"
+                  currentRole={currentRole}
+                  onClick={() => {
+                    // Handle manage users
+                  }}
+                >
+                  Manage Users
+                </RoleBasedButton>
+
+                <RoleBasedButton
+                  permission="canManageSettings"
+                  currentRole={currentRole}
+                  onClick={() => {
+                    deleteEvent(currentEvent.id.toString());
+                  }}
+                  variant="destructive"
+                >
+                  Delete Event
+                </RoleBasedButton>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>User Management</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <UserRoleManager
+                  eventId={currentEvent.id.toString()}
+                  currentUserRole={currentRole}
+                  userRoles={currentEvent.userRoles}
+                  onRoleChange={(userId, newRole) => {
+                    // Role change will be handled by the component
+                  }}
+                />
+              </CardContent>
+            </Card>
+          </div>
         </main>
       </div>
       
@@ -171,7 +260,7 @@ export default function EventPage() {
         open={isNewItemDialogOpen}
         onOpenChange={setIsNewItemDialogOpen}
         categories={categories || []}
-        eventId={eventId}
+        eventId={eventIdParsed}
         members={members || []}
       />
     </div>
