@@ -12,6 +12,7 @@ import { useWebSocket } from "@/lib/websocket";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import NewEventDialog from "@/components/app/NewEventDialog";
+import JoinEventDialog from "@/components/app/JoinEventDialog";
 import { Helmet } from "react-helmet-async";
 
 export default function Dashboard() {
@@ -19,6 +20,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const { authenticate } = useWebSocket();
   const [isNewEventDialogOpen, setIsNewEventDialogOpen] = useState(false);
+  const [isJoinEventDialogOpen, setIsJoinEventDialogOpen] = useState(false);
   
   // Fetch current user data
   const { data: user, isLoading: isLoadingUser, isError: isUserError } = useQuery({ 
@@ -163,7 +165,10 @@ export default function Dashboard() {
           <div>
             <h2 className="text-xl font-bold mb-4">Quick Links</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="hover:shadow-md transition cursor-pointer">
+              <Card 
+                className="hover:shadow-md transition cursor-pointer"
+                onClick={() => setIsNewEventDialogOpen(true)}
+              >
                 <CardContent className="p-6 flex items-center">
                   <div className="bg-blue-100 p-3 rounded-full mr-4">
                     <Plus className="h-6 w-6 text-primary" />
@@ -175,7 +180,10 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
               
-              <Card className="hover:shadow-md transition cursor-pointer">
+              <Card 
+                className="hover:shadow-md transition cursor-pointer"
+                onClick={() => setIsJoinEventDialogOpen(true)}
+              >
                 <CardContent className="p-6 flex items-center">
                   <div className="bg-blue-100 p-3 rounded-full mr-4">
                     <Users className="h-6 w-6 text-primary" />
@@ -187,7 +195,15 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
               
-              <Card className="hover:shadow-md transition cursor-pointer">
+              <Card 
+                className="hover:shadow-md transition cursor-pointer"
+                onClick={() => {
+                  toast({
+                    title: "Coming Soon",
+                    description: "Templates feature will be available in the next update",
+                  });
+                }}
+              >
                 <CardContent className="p-6 flex items-center">
                   <div className="bg-blue-100 p-3 rounded-full mr-4">
                     <Calendar className="h-6 w-6 text-primary" />
@@ -207,6 +223,12 @@ export default function Dashboard() {
       <NewEventDialog
         open={isNewEventDialogOpen}
         onOpenChange={setIsNewEventDialogOpen}
+      />
+      
+      {/* Join Event Dialog */}
+      <JoinEventDialog
+        open={isJoinEventDialogOpen}
+        onOpenChange={setIsJoinEventDialogOpen}
       />
     </div>
   );

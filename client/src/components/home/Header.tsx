@@ -12,8 +12,8 @@ export default function Header() {
         <div className="flex justify-between items-center py-4">
           {/* Logo */}
           <div className="flex items-center">
-            <Link href="/">
-              <a className="text-primary text-2xl font-bold">PackPal</a>
+            <Link href="/" className="text-primary text-2xl font-bold">
+              PackPal
             </Link>
           </div>
           
@@ -81,8 +81,8 @@ export default function Header() {
               >
                 Contact
               </a>
-              <Link href="/login">
-                <a className="text-primary hover:text-primary-dark font-medium">Log In</a>
+              <Link href="/login" className="text-primary hover:text-primary-dark font-medium">
+                Log In
               </Link>
             </div>
           </div>
