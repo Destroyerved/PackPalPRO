@@ -1,4 +1,5 @@
-import { pgTable, text, serial, integer, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, jsonb, timestamp, primaryKey } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -120,6 +121,64 @@ export type InsertCategory = z.infer<typeof insertCategorySchema>;
 
 export type Item = typeof items.$inferSelect;
 export type InsertItem = z.infer<typeof insertItemSchema>;
+
+// Define relations
+export const usersRelations = relations(users, ({ many }) => ({
+  events: many(events, { relationName: "user_events" }),
+  memberships: many(eventMembers, { relationName: "user_memberships" }),
+  items: many(items, { relationName: "user_items" }),
+}));
+
+export const eventsRelations = relations(events, ({ one, many }) => ({
+  creator: one(users, {
+    fields: [events.createdBy],
+    references: [users.id],
+    relationName: "user_events",
+  }),
+  members: many(eventMembers, { relationName: "event_members" }),
+  categories: many(categories, { relationName: "event_categories" }),
+  items: many(items, { relationName: "event_items" }),
+}));
+
+export const eventMembersRelations = relations(eventMembers, ({ one }) => ({
+  event: one(events, {
+    fields: [eventMembers.eventId],
+    references: [events.id],
+    relationName: "event_members",
+  }),
+  user: one(users, {
+    fields: [eventMembers.userId],
+    references: [users.id],
+    relationName: "user_memberships",
+  }),
+}));
+
+export const categoriesRelations = relations(categories, ({ one, many }) => ({
+  event: one(events, {
+    fields: [categories.eventId],
+    references: [events.id],
+    relationName: "event_categories",
+  }),
+  items: many(items, { relationName: "category_items" }),
+}));
+
+export const itemsRelations = relations(items, ({ one }) => ({
+  event: one(events, {
+    fields: [items.eventId],
+    references: [events.id],
+    relationName: "event_items",
+  }),
+  category: one(categories, {
+    fields: [items.categoryId],
+    references: [categories.id],
+    relationName: "category_items",
+  }),
+  assignee: one(users, {
+    fields: [items.assignedTo],
+    references: [users.id],
+    relationName: "user_items",
+  }),
+}));
 
 // WebSocket message types
 export enum WebSocketMessageType {
