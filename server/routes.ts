@@ -133,6 +133,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ message: "Server error" });
     }
   });
+  
+  // Join event by invite code
+  app.post("/api/events/join", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      
+      // Validate request body
+      const schema = z.object({
+        inviteCode: z.string().min(6)
+      });
+      
+      const { inviteCode } = schema.parse(req.body);
+      
+      // In a real app, we would look up the event by invite code
+      // For this MVP, we'll simplify and assume the invite code is the event ID
+      const eventId = parseInt(inviteCode);
+      
+      if (isNaN(eventId)) {
+        return res.status(400).json({ message: "Invalid invite code" });
+      }
+      
+      // Check if event exists
+      const event = await storage.getEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      // Check if user is already a member
+      const existingMember = await storage.getEventMember(eventId, userId);
+      if (existingMember) {
+        return res.status(400).json({ message: "You are already a member of this event" });
+      }
+      
+      // Add user as a member with MEMBER role
+      const member = await storage.addEventMember({
+        eventId,
+        userId,
+        role: UserRole.MEMBER
+      });
+      
+      // Broadcast member joined message
+      const message: WebSocketMessage = {
+        type: WebSocketMessageType.MEMBER_JOINED,
+        eventId,
+        payload: {
+          member: {
+            ...member,
+            user: await storage.getUser(userId)
+          }
+        }
+      };
+      
+      broadcastToEventMembers(eventId, message);
+      
+      // Return success with event details
+      res.status(201).json({
+        eventId: event.id,
+        eventName: event.name,
+        message: "Successfully joined event"
+      });
+    } catch (error) {
+      console.error("Error joining event:", error);
+      
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
 
   app.post("/api/events", isAuthenticated, async (req, res) => {
     try {
