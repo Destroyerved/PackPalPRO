@@ -37,12 +37,14 @@ import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Form schema
-const eventSchema = z.object({
+import { insertEventSchema } from "@shared/schema";
+
+const eventSchema = insertEventSchema.extend({
   name: z.string().min(1, "Event name is required"),
   description: z.string().optional(),
   location: z.string().optional(),
-  startDate: z.date().optional(),
-  endDate: z.date().optional(),
+  startDate: z.date().optional().nullable(),
+  endDate: z.date().optional().nullable(),
 }).refine(
   data => !data.startDate || !data.endDate || data.startDate <= data.endDate,
   {
@@ -78,8 +80,14 @@ export default function NewEventDialog({ open, onOpenChange }: NewEventDialogPro
     setIsSubmitting(true);
     
     try {
+      // Make sure we have createdBy field from the schema
+      const formData = {
+        ...values,
+        // The server will add the user ID from the session
+      };
+      
       // Submit to API
-      const response = await apiRequest("POST", "/api/events", values);
+      const response = await apiRequest("POST", "/api/events", formData);
       const newEvent = await response.json();
       
       // Success message

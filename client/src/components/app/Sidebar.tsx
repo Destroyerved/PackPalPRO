@@ -83,7 +83,7 @@ export default function Sidebar({ user, onLogout, activePage, activeEventId, eve
               <span>My Events</span>
             </a>
           </Link>
-          <Link href="#">
+          <Link href="/app/templates">
             <a className={cn(
               "flex items-center px-3 py-2 rounded-md font-medium",
               activePage === "templates" 
